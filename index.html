@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iPhone 17 在庫カウンター</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; background: #f0f2f5; color: #333; }
+
+  .header {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header-right { display: flex; gap: 10px; align-items: center; }
+
+  .scan-area {
+    background: #fff;
+    padding: 16px 24px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 56px;
+    z-index: 99;
+  }
+  .scan-area label { font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .scan-area input {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 18px;
+    border: 2px solid #007aff;
+    border-radius: 8px;
+    outline: none;
+    font-family: 'Consolas', monospace;
+  }
+  .scan-area input:focus { box-shadow: 0 0 0 3px rgba(0,122,255,0.2); }
+
+  .last-scan {
+    padding: 8px 24px;
+    background: #e8f5e9;
+    font-size: 13px;
+    color: #2e7d32;
+    display: none;
+    border-bottom: 1px solid #c8e6c9;
+  }
+  .last-scan.error { background: #ffebee; color: #c62828; border-color: #ffcdd2; }
+
+  .summary-bar {
+    padding: 10px 24px;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+  }
+  .total-count { font-weight: 700; font-size: 18px; color: #007aff; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+  .model-group {
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .model-group-header {
+    padding: 12px 20px;
+    font-weight: 700;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: default;
+  }
+  .model-group-header .group-total {
+    background: #007aff;
+    color: #fff;
+    border-radius: 20px;
+    padding: 2px 12px;
+    font-size: 13px;
+    min-width: 28px;
+    text-align: center;
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-top: 1px solid #f0f0f0;
+    transition: background 0.15s;
+  }
+  .color-row:hover { background: #f8f9fa; }
+  .color-row.highlight { background: #e3f2fd; animation: fadeHighlight 1.5s ease; }
+  @keyframes fadeHighlight { from { background: #bbdefb; } to { background: #e3f2fd; } }
+
+  .color-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+
+  .color-name { flex: 1; font-size: 14px; }
+  .jan-code { font-size: 12px; color: #888; font-family: 'Consolas', monospace; margin-right: 16px; min-width: 120px; }
+
+  .count-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .count-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #f5f5f5;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s;
+    color: #333;
+  }
+  .count-btn:hover { background: #e0e0e0; }
+  .count-btn:active { transform: scale(0.95); }
+  .count-btn.minus { color: #e53935; }
+  .count-btn.plus { color: #43a047; }
+
+  .count-display {
+    font-size: 20px;
+    font-weight: 700;
+    min-width: 40px;
+    text-align: center;
+    font-family: 'Consolas', monospace;
+  }
+  .count-display.has-count { color: #007aff; }
+
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: #007aff; color: #fff; }
+  .btn-primary:hover { background: #005ecb; }
+  .btn-danger { background: #ff3b30; color: #fff; }
+  .btn-danger:hover { background: #d32f2f; }
+  .btn-success { background: #34c759; color: #fff; }
+  .btn-success:hover { background: #2da44e; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #333;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 200;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* Pro colors */
+  .bg-pro { background: linear-gradient(90deg, #f5f5f5, #e8e8e8); }
+  /* Pro Max colors */
+  .bg-promax { background: linear-gradient(90deg, #f5f0ff, #ece6f5); }
+  /* Standard colors */
+  .bg-standard { background: linear-gradient(90deg, #f0f8ff, #e6f0fa); }
+
+  .mode-label {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.2);
+    margin-left: 8px;
+  }
+
+  .text-output {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 300;
+    justify-content: center;
+    align-items: center;
+  }
+  .text-output.show { display: flex; }
+  .text-output-inner {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .text-output-inner h2 { margin-bottom: 12px; font-size: 18px; }
+  .text-output-inner textarea {
+    flex: 1;
+    min-height: 300px;
+    font-family: 'Consolas', monospace;
+    font-size: 13px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    resize: none;
+  }
+  .text-output-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    justify-content: flex-end;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>iPhone 17 在庫カウンター</h1>
+  <div class="header-right">
+    <button class="btn btn-success" onclick="showTextOutput()">テキスト出力</button>
+    <button class="btn btn-danger" onclick="resetAll()">全リセット</button>
+  </div>
+</div>
+
+<div class="scan-area">
+  <label>JAN スキャン:</label>
+  <input type="text" id="scanInput" placeholder="バーコードを読み取ってください..." autofocus inputmode="none">
+</div>
+
+<div class="last-scan" id="lastScan"></div>
+
+<div class="summary-bar">
+  <span>合計台数: <span class="total-count" id="totalCount">0</span></span>
+  <span id="skuCount">0 / 0 SKU</span>
+</div>
+
+<div class="container" id="productContainer"></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="text-output" id="textOutput" onclick="if(event.target===this)closeTextOutput()">
+  <div class="text-output-inner">
+    <h2>在庫リスト (数量1以上のみ)</h2>
+    <textarea id="textArea" readonly></textarea>
+    <div class="text-output-actions">
+      <button class="btn btn-primary" onclick="copyText()">コピー</button>
+      <button class="btn" style="background:#eee" onclick="closeTextOutput()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const products = [
+  // iPhone 17 Pro 256GB
+  { group: "iPhone 17 Pro 256GB", model: "Pro", color: "シルバー",         jan: "4549995648294", swatch: "#C0C0C0", count: 0 },
+  { group: "iPhone 17 Pro 256GB", model: "Pro", color: "コズミックオレンジ", jan: "4549995648300", swatch: "#E87040", count: 0 },
+  { group: "iPhone 17 Pro 256GB", model: "Pro", color: "ディープブルー",    jan: "4549995648317", swatch: "#1B3A5C", count: 0 },
+  // iPhone 17 Pro 512GB
+  { group: "iPhone 17 Pro 512GB", model: "Pro", color: "シルバー",         jan: "4549995648324", swatch: "#C0C0C0", count: 0 },
+  { group: "iPhone 17 Pro 512GB", model: "Pro", color: "コズミックオレンジ", jan: "4549995648331", swatch: "#E87040", count: 0 },
+  { group: "iPhone 17 Pro 512GB", model: "Pro", color: "ディープブルー",    jan: "4549995648348", swatch: "#1B3A5C", count: 0 },
+  // iPhone 17 Pro 1TB
+  { group: "iPhone 17 Pro 1TB", model: "Pro", color: "シルバー",         jan: "4549995648355", swatch: "#C0C0C0", count: 0 },
+  { group: "iPhone 17 Pro 1TB", model: "Pro", color: "コズミックオレンジ", jan: "4549995648362", swatch: "#E87040", count: 0 },
+  { group: "iPhone 17 Pro 1TB", model: "Pro", color: "ディープブルー",    jan: "4549995648379", swatch: "#1B3A5C", count: 0 },
+
+  // iPhone 17 Pro Max 256GB
+  { group: "iPhone 17 Pro Max 256GB", model: "ProMax", color: "シルバー",         jan: "4549995649284", swatch: "#C0C0C0", count: 0 },
+  { group: "iPhone 17 Pro Max 256GB", model: "ProMax", color: "コズミックオレンジ", jan: "4549995649291", swatch: "#E87040", count: 0 },
+  { group: "iPhone 17 Pro Max 256GB", model: "ProMax", color: "ディープブルー",    jan: "4549995649307", swatch: "#1B3A5C", count: 0 },
+  // iPhone 17 Pro Max 512GB
+  { group: "iPhone 17 Pro Max 512GB", model: "ProMax", color: "シルバー",         jan: "4549995649314", swatch: "#C0C0C0", count: 0 },
+  { group: "iPhone 17 Pro Max 512GB", model: "ProMax", color: "コズミックオレンジ", jan: "4549995649321", swatch: "#E87040", count: 0 },
+  { group: "iPhone 17 Pro Max 512GB", model: "ProMax", color: "ディープブルー",    jan: "4549995649338", swatch: "#1B3A5C", count: 0 },
+  // iPhone 17 Pro Max 1TB
+  { group: "iPhone 17 Pro Max 1TB", model: "ProMax", color: "シルバー",         jan: "4549995649345", swatch: "#C0C0C0", count: 0 },
+  { group: "iPhone 17 Pro Max 1TB", model: "ProMax", color: "コズミックオレンジ", jan: "4549995649352", swatch: "#E87040", count: 0 },
+  { group: "iPhone 17 Pro Max 1TB", model: "ProMax", color: "ディープブルー",    jan: "4549995649369", swatch: "#1B3A5C", count: 0 },
+  // iPhone 17 Pro Max 2TB
+  { group: "iPhone 17 Pro Max 2TB", model: "ProMax", color: "シルバー",         jan: "4549995649376", swatch: "#C0C0C0", count: 0 },
+  { group: "iPhone 17 Pro Max 2TB", model: "ProMax", color: "コズミックオレンジ", jan: "4549995649383", swatch: "#E87040", count: 0 },
+  { group: "iPhone 17 Pro Max 2TB", model: "ProMax", color: "ディープブルー",    jan: "4549995649390", swatch: "#1B3A5C", count: 0 },
+
+  // iPhone 17 256GB
+  { group: "iPhone 17 256GB", model: "Standard", color: "ブラック",     jan: "4549995649154", swatch: "#1C1C1E", count: 0 },
+  { group: "iPhone 17 256GB", model: "Standard", color: "ホワイト",     jan: "4549995649161", swatch: "#F5F5F0", count: 0 },
+  { group: "iPhone 17 256GB", model: "Standard", color: "ミストブルー", jan: "4549995649178", swatch: "#A8C4D8", count: 0 },
+  { group: "iPhone 17 256GB", model: "Standard", color: "ラベンダー",   jan: "4549995649185", swatch: "#B8A9C9", count: 0 },
+  { group: "iPhone 17 256GB", model: "Standard", color: "セージ",       jan: "4549995649192", swatch: "#9CAF88", count: 0 },
+  // iPhone 17 512GB
+  { group: "iPhone 17 512GB", model: "Standard", color: "ブラック",     jan: "4549995649208", swatch: "#1C1C1E", count: 0 },
+  { group: "iPhone 17 512GB", model: "Standard", color: "ホワイト",     jan: "4549995649215", swatch: "#F5F5F0", count: 0 },
+  { group: "iPhone 17 512GB", model: "Standard", color: "ミストブルー", jan: "4549995649222", swatch: "#A8C4D8", count: 0 },
+  { group: "iPhone 17 512GB", model: "Standard", color: "ラベンダー",   jan: "4549995649239", swatch: "#B8A9C9", count: 0 },
+  { group: "iPhone 17 512GB", model: "Standard", color: "セージ",       jan: "4549995649246", swatch: "#9CAF88", count: 0 },
+];
+
+const janMap = {};
+products.forEach((p, i) => { janMap[p.jan] = i; });
+
+function render() {
+  const container = document.getElementById('productContainer');
+  container.innerHTML = '';
+
+  const groups = [];
+  const groupMap = {};
+  products.forEach((p, i) => {
+    if (!groupMap[p.group]) {
+      groupMap[p.group] = { name: p.group, model: p.model, items: [] };
+      groups.push(groupMap[p.group]);
+    }
+    groupMap[p.group].items.push({ ...p, index: i });
+  });
+
+  groups.forEach(g => {
+    const div = document.createElement('div');
+    div.className = 'model-group';
+
+    const bgClass = g.model === 'Pro' ? 'bg-pro' : g.model === 'ProMax' ? 'bg-promax' : 'bg-standard';
+    const groupTotal = g.items.reduce((s, it) => s + it.count, 0);
+
+    let html = `<div class="model-group-header ${bgClass}">
+      <span>${g.name}</span>
+      <span class="group-total">${groupTotal}</span>
+    </div>`;
+
+    g.items.forEach(item => {
+      html += `<div class="color-row" id="row-${item.index}">
+        <div class="color-swatch" style="background:${item.swatch}"></div>
+        <span class="color-name">${item.color}</span>
+        <span class="jan-code">${item.jan}</span>
+        <div class="count-controls">
+          <button class="count-btn minus" onclick="changeCount(${item.index}, -1)">-</button>
+          <span class="count-display ${item.count > 0 ? 'has-count' : ''}" id="count-${item.index}">${item.count}</span>
+          <button class="count-btn plus" onclick="changeCount(${item.index}, 1)">+</button>
+        </div>
+      </div>`;
+    });
+
+    div.innerHTML = html;
+    container.appendChild(div);
+  });
+
+  updateSummary();
+}
+
+function changeCount(index, delta) {
+  products[index].count = Math.max(0, products[index].count + delta);
+  render();
+  saveState();
+}
+
+function updateSummary() {
+  const total = products.reduce((s, p) => s + p.count, 0);
+  const skuWithCount = products.filter(p => p.count > 0).length;
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('skuCount').textContent = `${skuWithCount} / ${products.length} SKU`;
+}
+
+function handleScan(jan) {
+  jan = jan.trim();
+  if (!jan) return;
+
+  const lastScanEl = document.getElementById('lastScan');
+
+  if (janMap[jan] !== undefined) {
+    const idx = janMap[jan];
+    products[idx].count++;
+    saveState();
+    render();
+
+    lastScanEl.style.display = 'block';
+    lastScanEl.className = 'last-scan';
+    lastScanEl.textContent = `${products[idx].group} ${products[idx].color} (+1 = ${products[idx].count})`;
+
+    const row = document.getElementById(`row-${idx}`);
+    if (row) {
+      row.classList.remove('highlight');
+      void row.offsetWidth;
+      row.classList.add('highlight');
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    showToast(`${products[idx].color} +1`);
+  } else {
+    lastScanEl.style.display = 'block';
+    lastScanEl.className = 'last-scan error';
+    lastScanEl.textContent = `未登録のJANコード: ${jan}`;
+    showToast('未登録のコードです', true);
+  }
+}
+
+document.getElementById('scanInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    handleScan(this.value);
+    this.value = '';
+  }
+});
+
+function showToast(msg, isError) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.background = isError ? '#ff3b30' : '#333';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 1500);
+}
+
+function showTextOutput() {
+  const lines = [];
+  let currentGroup = '';
+
+  products.forEach(p => {
+    if (p.count < 1) return;
+    if (p.group !== currentGroup) {
+      if (lines.length > 0) lines.push('');
+      lines.push(`【${p.group}】`);
+      currentGroup = p.group;
+    }
+    lines.push(`  ${p.color}: ${p.count}台`);
+  });
+
+  if (lines.length === 0) {
+    showToast('数量1以上の商品がありません');
+    return;
+  }
+
+  const total = products.reduce((s, p) => s + p.count, 0);
+  lines.push('');
+  lines.push(`合計: ${total}台`);
+
+  document.getElementById('textArea').value = lines.join('\n');
+  document.getElementById('textOutput').classList.add('show');
+}
+
+function closeTextOutput() {
+  document.getElementById('textOutput').classList.remove('show');
+  document.getElementById('scanInput').focus();
+}
+
+function copyText() {
+  const ta = document.getElementById('textArea');
+  ta.select();
+  navigator.clipboard.writeText(ta.value).then(() => {
+    showToast('コピーしました');
+  });
+}
+
+function resetAll() {
+  if (!confirm('全てのカウントをリセットしますか？')) return;
+  products.forEach(p => p.count = 0);
+  document.getElementById('lastScan').style.display = 'none';
+  saveState();
+  render();
+  showToast('リセットしました');
+}
+
+function saveState() {
+  try {
+    const data = products.map(p => p.count);
+    localStorage.setItem('iphone17_counts', JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('iphone17_counts');
+    if (saved) {
+      const data = JSON.parse(saved);
+      data.forEach((c, i) => { if (products[i]) products[i].count = c; });
+    }
+  } catch(e) {}
+}
+
+try {
+  loadState();
+  render();
+  document.getElementById('scanInput').focus();
+} catch(e) {
+  document.getElementById('productContainer').innerHTML = '<p style="color:red;padding:20px;">エラー: ' + e.message + '</p>';
+  console.error(e);
+}
+</script>
+
+</body>
+</html>
