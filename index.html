@@ -180,6 +180,66 @@
   }
   .count-display.has-count { color: #007aff; }
 
+  /* テンキーパッド */
+  .numpad-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 400;
+    justify-content: center;
+    align-items: center;
+  }
+  .numpad-overlay.show { display: flex; }
+  .numpad-inner {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    width: 280px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+  .numpad-title {
+    font-size: 14px;
+    color: #666;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .numpad-value {
+    font-size: 32px;
+    font-weight: 700;
+    text-align: center;
+    color: #007aff;
+    padding: 8px;
+    border-bottom: 2px solid #007aff;
+    margin-bottom: 12px;
+    font-family: 'Consolas', monospace;
+    min-height: 48px;
+  }
+  .numpad-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .numpad-key {
+    height: 50px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: #f8f8f8;
+    font-size: 22px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .numpad-key:active { background: #e0e0e0; }
+  .numpad-key.del { color: #e53935; font-size: 16px; }
+  .numpad-key.ok { background: #007aff; color: #fff; }
+  .numpad-key.ok:active { background: #005ecb; }
+  .numpad-key.cancel { color: #999; font-size: 14px; }
+
   .btn {
     padding: 8px 16px;
     border: none;
@@ -303,6 +363,27 @@
   </div>
 </div>
 
+<div class="numpad-overlay" id="numpadOverlay" onclick="if(event.target===this)closeNumpad()">
+  <div class="numpad-inner">
+    <div class="numpad-title" id="numpadTitle"></div>
+    <div class="numpad-value" id="numpadValue">0</div>
+    <div class="numpad-grid">
+      <button class="numpad-key" onclick="numpadInput('1')">1</button>
+      <button class="numpad-key" onclick="numpadInput('2')">2</button>
+      <button class="numpad-key" onclick="numpadInput('3')">3</button>
+      <button class="numpad-key" onclick="numpadInput('4')">4</button>
+      <button class="numpad-key" onclick="numpadInput('5')">5</button>
+      <button class="numpad-key" onclick="numpadInput('6')">6</button>
+      <button class="numpad-key" onclick="numpadInput('7')">7</button>
+      <button class="numpad-key" onclick="numpadInput('8')">8</button>
+      <button class="numpad-key" onclick="numpadInput('9')">9</button>
+      <button class="numpad-key del" onclick="numpadInput('del')">削除</button>
+      <button class="numpad-key" onclick="numpadInput('0')">0</button>
+      <button class="numpad-key ok" onclick="numpadConfirm()">OK</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const products = [
   // iPhone 17 Pro 256GB
@@ -385,10 +466,8 @@ function render() {
         <span class="jan-code">${item.jan}</span>
         <div class="count-controls">
           <button class="count-btn minus" onclick="changeCount(${item.index}, -1)">-</button>
-          <input type="number" class="count-display ${item.count > 0 ? 'has-count' : ''}" id="count-${item.index}" value="${item.count}" min="0"
-            onfocus="this.select()"
-            onchange="setCount(${item.index}, this.value)"
-            onblur="setCount(${item.index}, this.value)">
+          <span class="count-display ${item.count > 0 ? 'has-count' : ''}" id="count-${item.index}"
+            onclick="openNumpad(${item.index})">${item.count}</span>
           <button class="count-btn plus" onclick="changeCount(${item.index}, 1)">+</button>
         </div>
       </div>`;
@@ -413,6 +492,46 @@ function setCount(index, value) {
   products[index].count = num;
   render();
   saveState();
+}
+
+// テンキーパッド
+let numpadIndex = -1;
+let numpadVal = '0';
+
+function openNumpad(index) {
+  numpadIndex = index;
+  numpadVal = String(products[index].count);
+  document.getElementById('numpadTitle').textContent =
+    products[index].group + ' ' + products[index].color;
+  document.getElementById('numpadValue').textContent = numpadVal || '0';
+  document.getElementById('numpadOverlay').classList.add('show');
+}
+
+function closeNumpad() {
+  document.getElementById('numpadOverlay').classList.remove('show');
+  numpadIndex = -1;
+  setTimeout(function() { scanInputEl.focus(); }, 50);
+}
+
+function numpadInput(key) {
+  if (key === 'del') {
+    numpadVal = numpadVal.slice(0, -1);
+  } else {
+    if (numpadVal === '0') numpadVal = '';
+    numpadVal += key;
+  }
+  document.getElementById('numpadValue').textContent = numpadVal || '0';
+}
+
+function numpadConfirm() {
+  if (numpadIndex >= 0) {
+    var num = parseInt(numpadVal, 10);
+    if (isNaN(num) || num < 0) num = 0;
+    products[numpadIndex].count = num;
+    saveState();
+    render();
+  }
+  closeNumpad();
 }
 
 function updateSummary() {
@@ -606,16 +725,21 @@ try {
 }
 
 // 常に入力欄にフォーカスを維持（ダイアログ閉じた後、ボタン押した後など）
-// ただしカウント入力欄を編集中はそちらを優先
+// テンキーパッドやテキスト出力モーダルが開いている時は除外
+function isModalOpen() {
+  return document.getElementById('numpadOverlay').classList.contains('show')
+    || document.getElementById('textOutput').classList.contains('show');
+}
 document.addEventListener('click', function(e) {
-  if (e.target && e.target.classList && e.target.classList.contains('count-display')) return;
-  setTimeout(function() { scanInputEl.focus(); }, 50);
+  if (isModalOpen()) return;
+  if (e.target && e.target.closest && e.target.closest('.numpad-inner')) return;
+  setTimeout(function() { if (!isModalOpen()) scanInputEl.focus(); }, 50);
 });
 document.addEventListener('focusin', function(e) {
+  if (isModalOpen()) return;
   if (e.target === scanInputEl) return;
   if (e.target.tagName === 'TEXTAREA') return;
-  if (e.target.classList && e.target.classList.contains('count-display')) return;
-  setTimeout(function() { scanInputEl.focus(); }, 50);
+  setTimeout(function() { if (!isModalOpen()) scanInputEl.focus(); }, 50);
 });
 </script>
 
