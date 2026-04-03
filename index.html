@@ -516,6 +516,11 @@ function resetAll() {
   saveState();
   render();
   showToast('リセットしました');
+  // リセット後に入力欄を再フォーカス
+  setTimeout(function() {
+    scanInputEl.value = '';
+    scanInputEl.focus();
+  }, 100);
 }
 
 function saveState() {
