@@ -558,49 +558,56 @@ function handleScan(jan) {
   }
 }
 
-// BTリーダー対応: 13桁揃ったら即処理 or 500ms待機後に処理
+// BTリーダー対応: 13桁揃ったら処理、二重処理防止ロック付き
 let scanTimer = null;
+let processing = false;
 const scanInputEl = document.getElementById('scanInput');
 const JAN_LENGTH = 13;
 
-function processScan() {
+function doScan(val) {
+  if (processing) return;
+  val = val.replace(/[^0-9]/g, '');
+  if (!val) return;
+
+  processing = true;
   clearTimeout(scanTimer);
   scanTimer = null;
-  const val = scanInputEl.value.replace(/[^0-9]/g, '');
+
   if (val.length >= JAN_LENGTH) {
     handleScan(val.slice(0, JAN_LENGTH));
-    scanInputEl.value = '';
-  } else if (val.length > 0) {
-    // 13桁未満 → まだ入力途中の可能性があるので更に待つ
-    scanTimer = setTimeout(function() {
-      const finalVal = scanInputEl.value.replace(/[^0-9]/g, '');
-      if (finalVal.length > 0) {
-        handleScan(finalVal);
-        scanInputEl.value = '';
-      }
-    }, 500);
+  } else {
+    handleScan(val);
   }
+  scanInputEl.value = '';
+
+  // 300msロックして二重処理を防止
+  setTimeout(function() { processing = false; }, 300);
 }
 
 scanInputEl.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
+    if (processing) return;
     clearTimeout(scanTimer);
-    // Enter後も文字が来る可能性があるので少し待つ
-    scanTimer = setTimeout(processScan, 150);
+    // Enter後もまだ文字が届く可能性があるので少し待つ
+    scanTimer = setTimeout(function() {
+      doScan(scanInputEl.value);
+    }, 150);
   }
 });
 
 scanInputEl.addEventListener('input', function() {
+  if (processing) return;
   clearTimeout(scanTimer);
   const val = scanInputEl.value.replace(/[^0-9]/g, '');
   if (val.length >= JAN_LENGTH) {
     // 13桁揃ったら即処理
-    handleScan(val.slice(0, JAN_LENGTH));
-    scanInputEl.value = '';
+    doScan(val);
   } else {
-    // まだ途中 → 500ms待機
-    scanTimer = setTimeout(processScan, 500);
+    // まだ途中 → 500ms待ってから処理
+    scanTimer = setTimeout(function() {
+      if (!processing) doScan(scanInputEl.value);
+    }, 500);
   }
 });
 
