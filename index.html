@@ -558,55 +558,43 @@ function handleScan(jan) {
   }
 }
 
-// BTリーダー対応（iOS/Android両対応版）
+// BTリーダー対応（iOS/Android両対応 - ポーリング方式）
 const scanInputEl = document.getElementById('scanInput');
 const JAN_LENGTH = 13;
-let scanTimer = null;
-let lastProcessedValue = '';
-let lastProcessedTime = 0;
+let lastValue = '';
+let stableCount = 0;
 
-function clearInput() {
-  scanInputEl.value = '';
-  scanInputEl.setAttribute('value', '');
-  try { scanInputEl.setSelectionRange(0, 0); } catch(e) {}
-}
+// 100msごとに入力欄を監視。値が変わらず安定したら処理
+setInterval(function() {
+  var current = scanInputEl.value.replace(/[^0-9]/g, '');
 
-function doScan() {
-  clearTimeout(scanTimer);
-  scanTimer = null;
-
-  var digits = scanInputEl.value.replace(/[^0-9]/g, '');
-  if (!digits) return;
-
-  if (digits.length >= JAN_LENGTH) {
-    digits = digits.slice(0, JAN_LENGTH);
-  }
-
-  // 同じ値が50ms以内に再度来た場合のみ無視（iOS二重発火対策）
-  var now = Date.now();
-  if (digits === lastProcessedValue && now - lastProcessedTime < 50) {
-    clearInput();
+  if (current.length === 0) {
+    lastValue = '';
+    stableCount = 0;
     return;
   }
 
-  lastProcessedValue = digits;
-  lastProcessedTime = now;
-  handleScan(digits);
-  clearInput();
-}
-
-scanInputEl.addEventListener('input', function() {
-  clearTimeout(scanTimer);
-  var digits = scanInputEl.value.replace(/[^0-9]/g, '');
-
-  if (digits.length >= JAN_LENGTH) {
-    doScan();
-  } else if (digits.length > 0) {
-    scanTimer = setTimeout(doScan, 500);
+  if (current === lastValue) {
+    stableCount++;
+    // 値が2回連続同じ(=200ms安定) かつ 1桁以上 → 処理
+    if (stableCount === 2) {
+      var digits = current;
+      if (digits.length >= JAN_LENGTH) {
+        digits = digits.slice(0, JAN_LENGTH);
+      }
+      handleScan(digits);
+      scanInputEl.value = '';
+      scanInputEl.setAttribute('value', '');
+      lastValue = '';
+      stableCount = 0;
+    }
+  } else {
+    lastValue = current;
+    stableCount = 0;
   }
-});
+}, 100);
 
-// Enterキーは入力欄クリアのみ（処理はinputイベントに任せる）
+// Enterキーはデフォルト動作を抑止するだけ
 scanInputEl.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
