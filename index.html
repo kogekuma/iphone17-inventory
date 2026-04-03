@@ -383,7 +383,7 @@ function updateSummary() {
 }
 
 function handleScan(jan) {
-  jan = jan.trim();
+  jan = jan.replace(/[^0-9]/g, '');
   if (!jan) return;
 
   const lastScanEl = document.getElementById('lastScan');
