@@ -415,32 +415,50 @@ function handleScan(jan) {
   }
 }
 
-// BTリーダー対応: Enter or デバウンス(200ms入力停止)で処理
+// BTリーダー対応: 13桁揃ったら即処理 or 500ms待機後に処理
 let scanTimer = null;
 const scanInputEl = document.getElementById('scanInput');
+const JAN_LENGTH = 13;
 
 function processScan() {
   clearTimeout(scanTimer);
   scanTimer = null;
-  const val = scanInputEl.value;
-  if (val) {
-    handleScan(val);
+  const val = scanInputEl.value.replace(/[^0-9]/g, '');
+  if (val.length >= JAN_LENGTH) {
+    handleScan(val.slice(0, JAN_LENGTH));
     scanInputEl.value = '';
+  } else if (val.length > 0) {
+    // 13桁未満 → まだ入力途中の可能性があるので更に待つ
+    scanTimer = setTimeout(function() {
+      const finalVal = scanInputEl.value.replace(/[^0-9]/g, '');
+      if (finalVal.length > 0) {
+        handleScan(finalVal);
+        scanInputEl.value = '';
+      }
+    }, 500);
   }
 }
 
 scanInputEl.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
-    // Enter時も少し待ってから処理（BTリーダーがEnter後にも文字を送る場合対応）
     clearTimeout(scanTimer);
-    scanTimer = setTimeout(processScan, 100);
+    // Enter後も文字が来る可能性があるので少し待つ
+    scanTimer = setTimeout(processScan, 150);
   }
 });
 
 scanInputEl.addEventListener('input', function() {
   clearTimeout(scanTimer);
-  scanTimer = setTimeout(processScan, 200);
+  const val = scanInputEl.value.replace(/[^0-9]/g, '');
+  if (val.length >= JAN_LENGTH) {
+    // 13桁揃ったら即処理
+    handleScan(val.slice(0, JAN_LENGTH));
+    scanInputEl.value = '';
+  } else {
+    // まだ途中 → 500ms待機
+    scanTimer = setTimeout(processScan, 500);
+  }
 });
 
 function showToast(msg, isError) {
