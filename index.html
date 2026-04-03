@@ -606,11 +606,10 @@ scanInputEl.addEventListener('input', function() {
   }
 });
 
+// Enterキーは入力欄クリアのみ（処理はinputイベントに任せる）
 scanInputEl.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
-    clearTimeout(scanTimer);
-    scanTimer = setTimeout(doScan, 150);
   }
 });
 
