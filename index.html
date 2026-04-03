@@ -415,11 +415,32 @@ function handleScan(jan) {
   }
 }
 
-document.getElementById('scanInput').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    handleScan(this.value);
-    this.value = '';
+// BTリーダー対応: Enter or デバウンス(200ms入力停止)で処理
+let scanTimer = null;
+const scanInputEl = document.getElementById('scanInput');
+
+function processScan() {
+  clearTimeout(scanTimer);
+  scanTimer = null;
+  const val = scanInputEl.value;
+  if (val) {
+    handleScan(val);
+    scanInputEl.value = '';
   }
+}
+
+scanInputEl.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    // Enter時も少し待ってから処理（BTリーダーがEnter後にも文字を送る場合対応）
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(processScan, 100);
+  }
+});
+
+scanInputEl.addEventListener('input', function() {
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(processScan, 200);
 });
 
 function showToast(msg, isError) {
