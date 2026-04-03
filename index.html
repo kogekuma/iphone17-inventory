@@ -543,11 +543,21 @@ function loadState() {
 try {
   loadState();
   render();
-  document.getElementById('scanInput').focus();
+  scanInputEl.focus();
 } catch(e) {
   document.getElementById('productContainer').innerHTML = '<p style="color:red;padding:20px;">エラー: ' + e.message + '</p>';
   console.error(e);
 }
+
+// 常に入力欄にフォーカスを維持（ダイアログ閉じた後、ボタン押した後など）
+document.addEventListener('click', function() {
+  setTimeout(function() { scanInputEl.focus(); }, 50);
+});
+document.addEventListener('focusin', function(e) {
+  if (e.target !== scanInputEl && e.target.tagName !== 'TEXTAREA') {
+    setTimeout(function() { scanInputEl.focus(); }, 50);
+  }
+});
 </script>
 
 </body>
