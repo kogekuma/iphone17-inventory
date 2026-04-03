@@ -558,56 +558,67 @@ function handleScan(jan) {
   }
 }
 
-// BTリーダー対応: 13桁揃ったら処理、二重処理防止ロック付き
-let scanTimer = null;
-let processing = false;
+// BTリーダー対応（iOS Safari対応版）
 const scanInputEl = document.getElementById('scanInput');
 const JAN_LENGTH = 13;
+let scanTimer = null;
+let lastProcessedTime = 0;
 
-function doScan(val) {
-  if (processing) return;
-  val = val.replace(/[^0-9]/g, '');
-  if (!val) return;
+function clearInput() {
+  scanInputEl.value = '';
+  // iOS Safari対策: 複数の方法でクリア
+  scanInputEl.setAttribute('value', '');
+  if (scanInputEl.setSelectionRange) {
+    try { scanInputEl.setSelectionRange(0, 0); } catch(e) {}
+  }
+}
 
-  processing = true;
+function doScan() {
   clearTimeout(scanTimer);
   scanTimer = null;
 
-  if (val.length >= JAN_LENGTH) {
-    handleScan(val.slice(0, JAN_LENGTH));
-  } else {
-    handleScan(val);
+  var now = Date.now();
+  // 前回処理から300ms以内は無視（二重処理防止）
+  if (now - lastProcessedTime < 300) {
+    clearInput();
+    return;
   }
-  scanInputEl.value = '';
 
-  // 300msロックして二重処理を防止
-  setTimeout(function() { processing = false; }, 300);
+  var raw = scanInputEl.value;
+  var digits = raw.replace(/[^0-9]/g, '');
+  if (!digits) return;
+
+  // 13桁以上あれば先頭13桁を使用
+  if (digits.length >= JAN_LENGTH) {
+    digits = digits.slice(0, JAN_LENGTH);
+  }
+
+  lastProcessedTime = now;
+  handleScan(digits);
+  clearInput();
 }
 
-scanInputEl.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    if (processing) return;
-    clearTimeout(scanTimer);
-    // Enter後もまだ文字が届く可能性があるので少し待つ
-    scanTimer = setTimeout(function() {
-      doScan(scanInputEl.value);
-    }, 150);
+// inputイベント: 文字が入力されるたびにチェック
+scanInputEl.addEventListener('input', function() {
+  clearTimeout(scanTimer);
+  var digits = scanInputEl.value.replace(/[^0-9]/g, '');
+
+  if (digits.length >= JAN_LENGTH) {
+    // 13桁揃ったら即処理
+    doScan();
+  } else if (digits.length > 0) {
+    // まだ途中 → 500ms待機
+    scanTimer = setTimeout(doScan, 500);
   }
 });
 
-scanInputEl.addEventListener('input', function() {
-  if (processing) return;
-  clearTimeout(scanTimer);
-  const val = scanInputEl.value.replace(/[^0-9]/g, '');
-  if (val.length >= JAN_LENGTH) {
-    // 13桁揃ったら即処理
-    doScan(val);
-  } else {
-    // まだ途中 → 500ms待ってから処理
-    scanTimer = setTimeout(function() {
-      if (!processing) doScan(scanInputEl.value);
-    }, 500);
+// keydownイベント: Enterキー対応
+scanInputEl.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    clearTimeout(scanTimer);
+    // Enter後に文字が来る場合があるので少し待つ
+    scanTimer = setTimeout(doScan, 150);
   }
 });
 
