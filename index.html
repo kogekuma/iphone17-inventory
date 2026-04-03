@@ -161,9 +161,22 @@
   .count-display {
     font-size: 20px;
     font-weight: 700;
-    min-width: 40px;
+    width: 48px;
     text-align: center;
     font-family: 'Consolas', monospace;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 4px;
+    background: transparent;
+    cursor: pointer;
+    -moz-appearance: textfield;
+  }
+  .count-display::-webkit-outer-spin-button,
+  .count-display::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .count-display:focus {
+    border-color: #007aff;
+    outline: none;
+    background: #f0f8ff;
   }
   .count-display.has-count { color: #007aff; }
 
@@ -372,7 +385,10 @@ function render() {
         <span class="jan-code">${item.jan}</span>
         <div class="count-controls">
           <button class="count-btn minus" onclick="changeCount(${item.index}, -1)">-</button>
-          <span class="count-display ${item.count > 0 ? 'has-count' : ''}" id="count-${item.index}">${item.count}</span>
+          <input type="number" class="count-display ${item.count > 0 ? 'has-count' : ''}" id="count-${item.index}" value="${item.count}" min="0"
+            onfocus="this.select()"
+            onchange="setCount(${item.index}, this.value)"
+            onblur="setCount(${item.index}, this.value)">
           <button class="count-btn plus" onclick="changeCount(${item.index}, 1)">+</button>
         </div>
       </div>`;
@@ -387,6 +403,14 @@ function render() {
 
 function changeCount(index, delta) {
   products[index].count = Math.max(0, products[index].count + delta);
+  render();
+  saveState();
+}
+
+function setCount(index, value) {
+  var num = parseInt(value, 10);
+  if (isNaN(num) || num < 0) num = 0;
+  products[index].count = num;
   render();
   saveState();
 }
@@ -582,13 +606,16 @@ try {
 }
 
 // 常に入力欄にフォーカスを維持（ダイアログ閉じた後、ボタン押した後など）
-document.addEventListener('click', function() {
+// ただしカウント入力欄を編集中はそちらを優先
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.classList && e.target.classList.contains('count-display')) return;
   setTimeout(function() { scanInputEl.focus(); }, 50);
 });
 document.addEventListener('focusin', function(e) {
-  if (e.target !== scanInputEl && e.target.tagName !== 'TEXTAREA') {
-    setTimeout(function() { scanInputEl.focus(); }, 50);
-  }
+  if (e.target === scanInputEl) return;
+  if (e.target.tagName === 'TEXTAREA') return;
+  if (e.target.classList && e.target.classList.contains('count-display')) return;
+  setTimeout(function() { scanInputEl.focus(); }, 50);
 });
 </script>
 
