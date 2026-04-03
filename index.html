@@ -34,7 +34,23 @@
     top: 56px;
     z-index: 99;
   }
-  .scan-area label { font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .mode-toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #f0f0f0;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .mode-toggle.active {
+    background: #007aff;
+    border-color: #007aff;
+  }
   .scan-area input {
     flex: 1;
     padding: 10px 14px;
@@ -248,7 +264,7 @@
 </div>
 
 <div class="scan-area">
-  <label>JAN スキャン:</label>
+  <button id="modeToggle" class="mode-toggle" onclick="toggleKeyboard()">📡</button>
   <input type="text" id="scanInput" placeholder="バーコードを読み取ってください..." autofocus inputmode="none">
 </div>
 
@@ -538,6 +554,22 @@ function loadState() {
       data.forEach((c, i) => { if (products[i]) products[i].count = c; });
     }
   } catch(e) {}
+}
+
+let keyboardMode = false;
+function toggleKeyboard() {
+  keyboardMode = !keyboardMode;
+  const btn = document.getElementById('modeToggle');
+  if (keyboardMode) {
+    scanInputEl.setAttribute('inputmode', 'numeric');
+    btn.textContent = '⌨️';
+    btn.classList.add('active');
+  } else {
+    scanInputEl.setAttribute('inputmode', 'none');
+    btn.textContent = '📡';
+    btn.classList.remove('active');
+  }
+  scanInputEl.focus();
 }
 
 try {
