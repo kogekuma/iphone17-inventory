@@ -558,66 +558,58 @@ function handleScan(jan) {
   }
 }
 
-// BTリーダー対応（iOS Safari対応版）
+// BTリーダー対応（iOS/Android両対応版）
 const scanInputEl = document.getElementById('scanInput');
 const JAN_LENGTH = 13;
 let scanTimer = null;
+let lastProcessedValue = '';
 let lastProcessedTime = 0;
 
 function clearInput() {
   scanInputEl.value = '';
-  // iOS Safari対策: 複数の方法でクリア
   scanInputEl.setAttribute('value', '');
-  if (scanInputEl.setSelectionRange) {
-    try { scanInputEl.setSelectionRange(0, 0); } catch(e) {}
-  }
+  try { scanInputEl.setSelectionRange(0, 0); } catch(e) {}
 }
 
 function doScan() {
   clearTimeout(scanTimer);
   scanTimer = null;
 
-  var now = Date.now();
-  // 前回処理から300ms以内は無視（二重処理防止）
-  if (now - lastProcessedTime < 300) {
-    clearInput();
-    return;
-  }
-
-  var raw = scanInputEl.value;
-  var digits = raw.replace(/[^0-9]/g, '');
+  var digits = scanInputEl.value.replace(/[^0-9]/g, '');
   if (!digits) return;
 
-  // 13桁以上あれば先頭13桁を使用
   if (digits.length >= JAN_LENGTH) {
     digits = digits.slice(0, JAN_LENGTH);
   }
 
+  // 同じ値が50ms以内に再度来た場合のみ無視（iOS二重発火対策）
+  var now = Date.now();
+  if (digits === lastProcessedValue && now - lastProcessedTime < 50) {
+    clearInput();
+    return;
+  }
+
+  lastProcessedValue = digits;
   lastProcessedTime = now;
   handleScan(digits);
   clearInput();
 }
 
-// inputイベント: 文字が入力されるたびにチェック
 scanInputEl.addEventListener('input', function() {
   clearTimeout(scanTimer);
   var digits = scanInputEl.value.replace(/[^0-9]/g, '');
 
   if (digits.length >= JAN_LENGTH) {
-    // 13桁揃ったら即処理
     doScan();
   } else if (digits.length > 0) {
-    // まだ途中 → 500ms待機
     scanTimer = setTimeout(doScan, 500);
   }
 });
 
-// keydownイベント: Enterキー対応
 scanInputEl.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
     clearTimeout(scanTimer);
-    // Enter後に文字が来る場合があるので少し待つ
     scanTimer = setTimeout(doScan, 150);
   }
 });
